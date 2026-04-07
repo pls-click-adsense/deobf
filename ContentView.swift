@@ -1,53 +1,121 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var inputText = ""
     @State private var outputText = ""
+    @State private var showFileImporter = false
 
     var body: some View {
-        VStack(spacing: 15) {
-            Text("MoonSec Deobfuscator")
-                .font(.title2)
-                .bold()
-                .padding(.top)
-
-            // 入力エリア
-            VStack(alignment: .leading) {
-                Text("Encoded Lua:").font(.caption).foregroundColor(.gray)
-                TextEditor(text: $inputText)
-                    .frame(height: 200)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
-            }
-
-            // 変換ボタン
-            Button(action: deobfuscate) {
-                Text("Deobfuscate ✨")
-                    .font(.headline)
-                    .foregroundColor(.white)
+        NavigationView {
+            VStack(spacing: 20) {
+                // 入力セクション
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Encoded Lua").font(.subheadline).bold()
+                        Spacer()
+                        
+                        // 【新機能】クリップボードから貼り付けボタン
+                        Button(action: pasteFromClipboard) {
+                            Label("Paste", systemImage: "doc.on.clipboard")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.blue)
+                        
+                        // 【新機能】ファイルを選択ボタン
+                        Button(action: { showFileImporter = true }) {
+                            Label("File", systemImage: "folder")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.orange)
+                    }
+                    
+                    TextEditor(text: $inputText)
+                        .frame(height: 250)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2)))
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                }
+                
+                // 変換ボタン（目立たせる）
+                Button(action: deobfuscate) {
+                    HStack {
+                        Image(systemName: "wand.and.stars")
+                        Text("Deobfuscate (MoonSec)")
+                            .bold()
+                    }
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.blue)
-                    .cornerRadius(12)
-            }
+                    .foregroundColor(.white)
+                    .cornerRadius(15)
+                    .shadow(radius: 3)
+                }
+                .padding(.horizontal)
 
-            // 出力エリア
-            VStack(alignment: .leading) {
-                Text("Result:").font(.caption).foregroundColor(.gray)
-                TextEditor(text: $outputText)
-                    .frame(height: 200)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.3)))
+                // 出力セクション
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Result").font(.subheadline).bold()
+                        Spacer()
+                        
+                        // コピーボタン
+                        Button(action: copyToClipboard) {
+                            Label("Copy", systemImage: "doc.on.doc")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.green)
+                    }
+                    
+                    TextEditor(text: $outputText)
+                        .frame(height: 250)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.2)))
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                }
+                
+                Spacer()
             }
-
-            Button("Copy to Clipboard") {
-                UIPasteboard.general.string = outputText
+            .padding()
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Lua Deobf V1")
+            
+            // ファイル選択画面のポップアップ
+            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.text, .plainText, UTType(filenameExtension: "lua")!], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    if let url = urls.first {
+                        if url.startAccessingSecurityScopedResource() {
+                            defer { url.stopAccessingSecurityScopedResource() }
+                            if let content = try? String(contentsOf: url) {
+                                self.inputText = content
+                            }
+                        }
+                    }
+                case .failure(let error):
+                    print("Error selecting file: \(error.localizedDescription)")
+                }
             }
-            .padding(.bottom)
         }
-        .padding()
+    }
+
+    // --- ロジック部分 ---
+
+    func pasteFromClipboard() {
+        if let pasteboardString = UIPasteboard.general.string {
+            self.inputText = pasteboardString
+        }
+    }
+
+    func copyToClipboard() {
+        UIPasteboard.general.string = outputText
     }
 
     func deobfuscate() {
-        // \104 形式を文字に戻す
+        // \数字 形式をデコード
         let pattern = #"\\(\d{1,3})"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
         
@@ -63,8 +131,8 @@ struct ContentView: View {
             }
         }
         
-        // ゴミ（コメント等）の簡易削除
-        result = result.replacingOccurrences(of: #"--\[\[.*?\]\]"#, with: "", options: .regularExpression)
+        // MoonSec特有のゴミ（長いコメント）を削除
+        result = result.replacingOccurrences(of: #"--\[\[.*\]\]"#, with: "", options: .regularExpression)
         
         self.outputText = result
     }
