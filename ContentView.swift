@@ -1,137 +1,91 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var inputText = ""
     @State private var outputText = ""
-    @State private var showFileImporter = false
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                // 入力セクション
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Encoded Lua").font(.subheadline).bold()
-                        Spacer()
-                        
-                        // 【新機能】クリップボードから貼り付けボタン
-                        Button(action: pasteFromClipboard) {
-                            Label("Paste", systemImage: "doc.on.clipboard")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.blue)
-                        
-                        // 【新機能】ファイルを選択ボタン
-                        Button(action: { showFileImporter = true }) {
-                            Label("File", systemImage: "folder")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.orange)
+        VStack(spacing: 10) {
+            Text("MoonSec Deobf v1.2")
+                .font(.headline)
+                .padding(.top)
+
+            // --- 入力エリア ---
+            HStack {
+                Text("Input").font(.caption).bold()
+                Spacer()
+                // 貼り付けボタン
+                Button("Paste") {
+                    if let string = UIPasteboard.general.string {
+                        inputText = string
                     }
-                    
-                    TextEditor(text: $inputText)
-                        .frame(height: 250)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2)))
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
                 }
-                
-                // 変換ボタン（目立たせる）
-                Button(action: deobfuscate) {
-                    HStack {
-                        Image(systemName: "wand.and.stars")
-                        Text("Deobfuscate (MoonSec)")
-                            .bold()
-                    }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(.horizontal)
+
+            TextEditor(text: $inputText)
+                .frame(height: 180)
+                .border(Color.gray.opacity(0.5), width: 1)
+                .cornerRadius(5)
+                .padding(.horizontal)
+
+            // --- メイン変換ボタン ---
+            Button(action: deobfuscate) {
+                Text("RUN DEOBFUSCATE")
+                    .bold()
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.blue)
                     .foregroundColor(.white)
-                    .cornerRadius(15)
-                    .shadow(radius: 3)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal)
+
+            // --- 出力エリア ---
+            HStack {
+                Text("Result").font(.caption).bold()
+                Spacer()
+                // コピーボタン
+                Button("Copy") {
+                    UIPasteboard.general.string = outputText
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(.green)
+            }
+            .padding(.horizontal)
+
+            TextEditor(text: $outputText)
+                .frame(height: 180)
+                .border(Color.blue.opacity(0.5), width: 1)
+                .cornerRadius(5)
                 .padding(.horizontal)
 
-                // 出力セクション
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Result").font(.subheadline).bold()
-                        Spacer()
-                        
-                        // コピーボタン
-                        Button(action: copyToClipboard) {
-                            Label("Copy", systemImage: "doc.on.doc")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.green)
-                    }
-                    
-                    TextEditor(text: $outputText)
-                        .frame(height: 250)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.2)))
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Lua Deobf V1")
-            
-            // ファイル選択画面のポップアップ
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.text, .plainText, UTType(filenameExtension: "lua")!], allowsMultipleSelection: false) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        if url.startAccessingSecurityScopedResource() {
-                            defer { url.stopAccessingSecurityScopedResource() }
-                            if let content = try? String(contentsOf: url) {
-                                self.inputText = content
-                            }
-                        }
-                    }
-                case .failure(let error):
-                    print("Error selecting file: \(error.localizedDescription)")
-                }
-            }
+            Spacer()
         }
-    }
-
-    // --- ロジック部分 ---
-
-    func pasteFromClipboard() {
-        if let pasteboardString = UIPasteboard.general.string {
-            self.inputText = pasteboardString
-        }
-    }
-
-    func copyToClipboard() {
-        UIPasteboard.general.string = outputText
+        .background(Color.white)
     }
 
     func deobfuscate() {
-        // \数字 形式をデコード
-        let pattern = #"\\(\d{1,3})"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
-        
         var result = inputText
-        let matches = regex.matches(in: inputText, range: NSRange(inputText.startIndex..., in: inputText))
         
-        for match in matches.reversed() {
-            if let range = Range(match.range(at: 1), in: inputText),
-               let code = UInt8(inputText[range]),
-               let charRange = Range(match.range, in: result) {
-                let char = String(UnicodeScalar(code))
-                result.replaceSubrange(charRange, with: char)
+        // 1. \数字 形式を復元
+        let pattern = #"\\(\d{1,3})"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+            for match in matches.reversed() {
+                if let range = Range(match.range(at: 1), in: result),
+                   let code = UInt8(result[range]),
+                   let charRange = Range(match.range, in: result) {
+                    let char = String(UnicodeScalar(code))
+                    result.replaceSubrange(charRange, with: char)
+                }
             }
         }
         
-        // MoonSec特有のゴミ（長いコメント）を削除
+        // 2. ゴミ削り
         result = result.replacingOccurrences(of: #"--\[\[.*\]\]"#, with: "", options: .regularExpression)
         
         self.outputText = result
