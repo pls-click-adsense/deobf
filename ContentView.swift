@@ -5,40 +5,49 @@ struct ContentView: View {
     @State private var outputText = ""
 
     var body: some View {
-        NavigationView {
-            VStack {
-                TextEditor(text: $inputText)
-                    .frame(height: 250)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5)))
-                    .padding()
-                
-                Button(action: deobfuscate) {
-                    Text("Deobfuscate (MoonSec)")
-                        .bold()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal)
+        VStack(spacing: 15) {
+            Text("MoonSec Deobfuscator")
+                .font(.title2)
+                .bold()
+                .padding(.top)
 
-                TextEditor(text: $outputText)
-                    .frame(height: 250)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.5)))
-                    .padding()
-                
-                Button("Copy Result") {
-                    UIPasteboard.general.string = outputText
-                }
-                .padding(.bottom)
+            // 入力エリア
+            VStack(alignment: .leading) {
+                Text("Encoded Lua:").font(.caption).foregroundColor(.gray)
+                TextEditor(text: $inputText)
+                    .frame(height: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
             }
-            .navigationTitle("Lua Deobfuscator")
+
+            // 変換ボタン
+            Button(action: deobfuscate) {
+                Text("Deobfuscate ✨")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+            }
+
+            // 出力エリア
+            VStack(alignment: .leading) {
+                Text("Result:").font(.caption).foregroundColor(.gray)
+                TextEditor(text: $outputText)
+                    .frame(height: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.3)))
+            }
+
+            Button("Copy to Clipboard") {
+                UIPasteboard.general.string = outputText
+            }
+            .padding(.bottom)
         }
+        .padding()
     }
 
     func deobfuscate() {
-        // \数字 形式をデコードするロジック
+        // \104 形式を文字に戻す
         let pattern = #"\\(\d{1,3})"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
         
@@ -54,8 +63,8 @@ struct ContentView: View {
             }
         }
         
-        // MoonSec特有のゴミ（長いコメント）を削除
-        result = result.replacingOccurrences(of: #"--\[\[.*\]\]"#, with: "", options: .regularExpression)
+        // ゴミ（コメント等）の簡易削除
+        result = result.replacingOccurrences(of: #"--\[\[.*?\]\]"#, with: "", options: .regularExpression)
         
         self.outputText = result
     }
