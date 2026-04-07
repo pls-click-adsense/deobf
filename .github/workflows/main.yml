@@ -7,30 +7,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Project
+      - name: Create App Bundle Structure
         run: |
-          mkdir -p MoonSecDeobf.swiftpm
-          cp ContentView.swift MoonSecDeobf.swiftpm/
-          cp MainApp.swift MoonSecDeobf.swiftpm/
-          cp Package.swift MoonSecDeobf.swiftpm/
+          # アプリのディレクトリ構造を手動で作る
+          mkdir -p MoonSecDeobf.app
           
-      - name: Build Archive
-        run: |
-          xcodebuild archive \
-            -scheme MoonSecDeobf \
-            -project MoonSecDeobf.swiftpm \
-            -archivePath MoonSecDeobf.xcarchive \
-            -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+          # Swiftファイルをコンパイルして実行ファイルを作る
+          swiftc -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
+            -target arm64-apple-ios15.0 \
+            -emit-executable \
+            -o MoonSecDeobf.app/MoonSecDeobf \
+            ContentView.swift MainApp.swift
+
+          # Info.plist（アプリの情報ファイル）を最小構成で作成
+          cat <<EOF > MoonSecDeobf.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>MoonSecDeobf</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.yourname.moonsecdeobf</string>
+              <key>CFBundleName</key>
+              <string>MoonSecDeobf</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>MinimumOSVersion</key>
+              <string>15.0</string>
+          </dict>
+          </plist>
+          EOF
 
       - name: Create IPA
         run: |
           mkdir -p Payload
-          # .appファイルを探してPayloadに入れる
-          find MoonSecDeobf.xcarchive -name "*.app" -exec cp -r {} Payload/ \;
-          # PayloadフォルダをzipしてIPAにする
+          cp -r MoonSecDeobf.app Payload/
           zip -r MoonSecDeobf.ipa Payload
           
       - name: Upload Artifact
