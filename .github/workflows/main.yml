@@ -1,0 +1,39 @@
+name: Build IPA
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.0.app
+
+      - name: Build IPA
+        run: |
+          # プロジェクト構造を整える
+          mkdir -p MoonSecDeobf.swiftpm
+          cp ContentView.swift MoonSecDeobf.swiftpm/
+          cp MainApp.swift MoonSecDeobf.swiftpm/
+          cp Package.swift MoonSecDeobf.swiftpm/
+          
+          # ビルド実行
+          xcodebuild archive \
+            -toolchain swift \
+            -scheme MoonSecDeobf \
+            -project MoonSecDeobf.swiftpm \
+            -archivePath MoonSecDeobf.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO
+
+          # IPA化
+          mkdir -p Payload
+          cp -r MoonSecDeobf.xcarchive/Products/usr/local/lib/*.app Payload/ 2>/dev/null || cp -r MoonSecDeobf.xcarchive/Products/Applications/*.app Payload/
+          zip -r MoonSecDeobf.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Deobfuscator-IPA
+          path: MoonSecDeobf.ipa
