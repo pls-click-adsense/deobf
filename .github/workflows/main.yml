@@ -7,31 +7,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.0.app
-
-      - name: Build IPA
+      - name: Setup Project
         run: |
-          # プロジェクト構造を整える
           mkdir -p MoonSecDeobf.swiftpm
           cp ContentView.swift MoonSecDeobf.swiftpm/
           cp MainApp.swift MoonSecDeobf.swiftpm/
           cp Package.swift MoonSecDeobf.swiftpm/
           
-          # ビルド実行
+      - name: Build Archive
+        run: |
           xcodebuild archive \
-            -toolchain swift \
             -scheme MoonSecDeobf \
             -project MoonSecDeobf.swiftpm \
             -archivePath MoonSecDeobf.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGNING_ALLOWED=NO
+            -allowProvisioningUpdates \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
-          # IPA化
+      - name: Create IPA
+        run: |
           mkdir -p Payload
-          cp -r MoonSecDeobf.xcarchive/Products/usr/local/lib/*.app Payload/ 2>/dev/null || cp -r MoonSecDeobf.xcarchive/Products/Applications/*.app Payload/
+          # .appファイルを探してPayloadに入れる
+          find MoonSecDeobf.xcarchive -name "*.app" -exec cp -r {} Payload/ \;
+          # PayloadフォルダをzipしてIPAにする
           zip -r MoonSecDeobf.ipa Payload
-
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
